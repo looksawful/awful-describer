@@ -1,0 +1,198 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-border-default;
+  }
+  
+  body {
+    @apply bg-bg-primary text-text-primary font-sans;
+    -webkit-app-region: no-drag;
+  }
+
+  input, textarea, select {
+    @apply bg-bg-secondary border border-border-default rounded px-3 py-2 text-text-primary outline-none transition-colors;
+  }
+
+  input:focus, textarea:focus, select:focus {
+    @apply border-accent-primary;
+  }
+
+  button {
+    @apply transition-all duration-150;
+  }
+
+  code, pre {
+    @apply font-mono;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply px-4 py-2 rounded font-medium transition-all duration-150 flex items-center gap-2 justify-center;
+  }
+
+  .btn-primary {
+    @apply bg-accent-primary text-bg-primary hover:bg-accent-secondary active:bg-accent-dim;
+  }
+
+  .btn-secondary {
+    @apply bg-bg-tertiary text-text-primary border border-border-default hover:border-border-hover hover:bg-bg-elevated;
+  }
+
+  .btn-danger {
+    @apply bg-status-error/20 text-status-error border border-status-error/30 hover:bg-status-error/30;
+  }
+
+  .btn-ghost {
+    @apply bg-transparent text-text-secondary hover:text-text-primary hover:bg-bg-tertiary;
+  }
+
+  .panel {
+    @apply bg-bg-secondary border border-border-default rounded-lg overflow-hidden;
+  }
+
+  .panel-header {
+    @apply px-4 py-3 border-b border-border-default flex items-center justify-between bg-bg-tertiary/50;
+  }
+
+  .panel-content {
+    @apply p-4;
+  }
+
+  .input-group {
+    @apply flex flex-col gap-1.5;
+  }
+
+  .input-label {
+    @apply text-xs font-medium text-text-secondary uppercase tracking-wide;
+  }
+
+  .status-dot {
+    @apply w-2 h-2 rounded-full;
+  }
+
+  .status-dot-success {
+    @apply bg-status-success shadow-[0_0_8px_rgba(0,255,136,0.5)];
+  }
+
+  .status-dot-warning {
+    @apply bg-status-warning shadow-[0_0_8px_rgba(255,170,0,0.5)];
+  }
+
+  .status-dot-error {
+    @apply bg-status-error shadow-[0_0_8px_rgba(255,68,68,0.5)];
+  }
+
+  .log-entry {
+    @apply font-mono text-xs leading-relaxed py-0.5;
+  }
+
+  .log-info {
+    @apply text-text-secondary;
+  }
+
+  .log-success {
+    @apply text-status-success;
+  }
+
+  .log-warning {
+    @apply text-status-warning;
+  }
+
+  .log-error {
+    @apply text-status-error;
+  }
+
+  .kbd {
+    @apply inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-mono bg-bg-tertiary border border-border-default rounded;
+  }
+
+  .tooltip {
+    @apply absolute z-50 px-2 py-1 text-xs bg-bg-elevated border border-border-default rounded shadow-lg;
+  }
+
+  .resizer {
+    @apply absolute bg-transparent hover:bg-accent-primary/30 transition-colors z-10;
+  }
+
+  .resizer-x {
+    @apply w-1 cursor-col-resize top-0 bottom-0;
+  }
+
+  .resizer-y {
+    @apply h-1 cursor-row-resize left-0 right-0;
+  }
+}
+
+@layer utilities {
+  .drag-region {
+    -webkit-app-region: drag;
+  }
+
+  .no-drag {
+    -webkit-app-region: no-drag;
+  }
+
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-accent-primary to-accent-secondary;
+  }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+  }
+
+  .animate-in {
+    animation: fadeIn 0.2s ease-out;
+  }
+
+  .slide-in {
+    animation: slideUp 0.2s ease-out;
+  }
+}
+
+/* Custom scrollbar for log areas */
+.log-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+
+.log-scroll::-webkit-scrollbar-thumb {
+  background: #2a2a2a;
+  border-radius: 2px;
+}
+
+/* Drag and drop highlight */
+.drop-zone {
+  @apply border-2 border-dashed border-border-default rounded-lg transition-colors;
+}
+
+.drop-zone.active {
+  @apply border-accent-primary bg-accent-primary/5;
+}
+
+/* Image preview grid */
+.image-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+/* Monaco editor override */
+.monaco-editor {
+  @apply rounded overflow-hidden;
+}
+
+/* Syntax highlighting for prompts */
+.syntax-variable {
+  @apply text-status-info;
+}
+
+.syntax-bracket {
+  @apply text-status-warning;
+}
+
+.syntax-keyword {
+  @apply text-accent-primary;
+}
