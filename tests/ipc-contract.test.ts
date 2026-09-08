@@ -41,12 +41,18 @@ test('external URLs are HTTPS-only', () => {
   assert.equal(isSafeExternalUrl('not a url'), false);
 });
 
-test('renderer sender policy distinguishes development and packaged URLs', () => {
-  assert.equal(isTrustedRendererUrl('http://localhost:5173/', true), true);
-  assert.equal(isTrustedRendererUrl('http://127.0.0.1:5173/', true), false);
-  assert.equal(isTrustedRendererUrl('https://example.com/', true), false);
-  assert.equal(isTrustedRendererUrl('file:///C:/app/dist/renderer/index.html', false), true);
-  assert.equal(isTrustedRendererUrl('file:///C:/Windows/System32/index.html', false), false);
+test('renderer sender policy binds development origin and exact packaged file', () => {
+  const devRenderer = 'http://localhost:5173/';
+  const packagedRenderer = 'file:///C:/app/dist/renderer/index.html';
+
+  assert.equal(isTrustedRendererUrl('http://localhost:5173/', devRenderer), true);
+  assert.equal(isTrustedRendererUrl('http://localhost:5173/settings', devRenderer), true);
+  assert.equal(isTrustedRendererUrl('http://127.0.0.1:5173/', devRenderer), false);
+  assert.equal(isTrustedRendererUrl('https://example.com/', devRenderer), false);
+
+  assert.equal(isTrustedRendererUrl(packagedRenderer, packagedRenderer), true);
+  assert.equal(isTrustedRendererUrl('file:///C:/evil/renderer/index.html', packagedRenderer), false);
+  assert.equal(isTrustedRendererUrl('file:///C:/app/dist/renderer/index.html?unexpected=1', packagedRenderer), false);
 });
 
 test('model options reject non-finite values and unknown keys', () => {
