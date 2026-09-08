@@ -7,6 +7,7 @@ import {
   sanitizeGenerateParams,
   sanitizeModelOptions,
 } from '../src/shared/ipc';
+import { LatestOperationGate } from '../src/shared/latestOperation';
 import {
   buildModelCommandArgs,
   RequestRegistry,
@@ -18,6 +19,19 @@ test('image MIME type follows the source extension', () => {
   assert.equal(getImageMimeType('render.webp'), 'image/webp');
   assert.equal(getImageMimeType('scan.tiff'), 'image/tiff');
   assert.equal(getImageMimeType('notes.txt'), null);
+});
+
+test('latest-operation gate invalidates stale async preview loads', () => {
+  const gate = new LatestOperationGate();
+  const first = gate.begin();
+  assert.equal(gate.isCurrent(first), true);
+
+  const second = gate.begin();
+  assert.equal(gate.isCurrent(first), false);
+  assert.equal(gate.isCurrent(second), true);
+
+  gate.invalidate(second);
+  assert.equal(gate.isCurrent(second), false);
 });
 
 test('external URLs are HTTPS-only', () => {
