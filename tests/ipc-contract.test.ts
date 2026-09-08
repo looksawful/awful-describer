@@ -27,6 +27,7 @@ test('renderer sender policy distinguishes development and packaged URLs', () =>
   assert.equal(isTrustedRendererUrl('http://127.0.0.1:5173/', true), false);
   assert.equal(isTrustedRendererUrl('https://example.com/', true), false);
   assert.equal(isTrustedRendererUrl('file:///C:/app/dist/renderer/index.html', false), true);
+  assert.equal(isTrustedRendererUrl('file:///C:/Windows/System32/index.html', false), false);
 });
 
 test('model options reject non-finite values and unknown keys', () => {
@@ -34,15 +35,17 @@ test('model options reject non-finite values and unknown keys', () => {
   assert.throws(() => sanitizeModelOptions({ top_p: Number.NaN }), /Invalid numeric model option/);
 });
 
-test('generate requests require an id, model and prompt', () => {
+test('generate requests require an id, model and prompt and allow realistic base64 sizes', () => {
+  const image = 'A'.repeat(40000);
   const result = sanitizeGenerateParams({
     requestId: 'request-1',
     model: 'llava:latest',
     prompt: 'Describe the image',
-    images: ['abc123'],
+    images: [image],
     options: { temperature: 0.2 },
   });
   assert.equal(result.requestId, 'request-1');
   assert.equal(result.model, 'llava:latest');
+  assert.equal(result.images?.[0].length, image.length);
   assert.throws(() => sanitizeGenerateParams({ model: 'llava:latest', prompt: 'x' }), /requestId/);
 });
