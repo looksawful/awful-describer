@@ -26,3 +26,6 @@ jobs:
 
       - name: Production build
         run: npm run build
+
+      - name: Electron runtime smoke
+        run: npm run smoke:electron:run
