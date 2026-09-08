@@ -2,7 +2,7 @@ import { BrowserWindow, shell } from 'electron';
 import * as path from 'path';
 import { isSafeExternalUrl, isTrustedRendererUrl } from '../shared/ipc';
 
-export function createMainWindow(isDev: boolean): BrowserWindow {
+export function createMainWindow(isDev: boolean, trustedRendererUrl: string): BrowserWindow {
   const window = new BrowserWindow({
     width: 1800,
     height: 1000,
@@ -35,17 +35,13 @@ export function createMainWindow(isDev: boolean): BrowserWindow {
   });
 
   window.webContents.on('will-navigate', (event, url) => {
-    if (isTrustedRendererUrl(url, isDev)) return;
+    if (isTrustedRendererUrl(url, trustedRendererUrl)) return;
     event.preventDefault();
     if (isSafeExternalUrl(url)) void shell.openExternal(url);
   });
 
-  if (isDev) {
-    void window.loadURL('http://localhost:5173');
-    window.webContents.openDevTools();
-  } else {
-    void window.loadFile(path.join(__dirname, '../renderer/index.html'));
-  }
+  void window.loadURL(trustedRendererUrl);
+  if (isDev) window.webContents.openDevTools();
 
   return window;
 }
