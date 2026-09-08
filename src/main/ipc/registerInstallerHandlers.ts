@@ -6,14 +6,19 @@ import { downloadOllamaInstaller } from '../services/installerService';
 
 export function registerInstallerHandlers(
   getMainWindow: () => BrowserWindow | null,
-  isDev: boolean,
+  trustedRendererUrl: string,
 ): void {
   let downloadedInstallerPath: string | null = null;
 
   const assertTrustedSender = (event: IpcMainInvokeEvent): void => {
-    const senderUrl = event.sender.getURL();
-    if (!isTrustedRendererUrl(senderUrl, isDev)) {
-      throw new Error(`Blocked installer IPC request from untrusted renderer: ${senderUrl}`);
+    const senderFrame = event.senderFrame;
+    const senderUrl = senderFrame?.url ?? '';
+    if (
+      !senderFrame ||
+      senderFrame !== event.sender.mainFrame ||
+      !isTrustedRendererUrl(senderUrl, trustedRendererUrl)
+    ) {
+      throw new Error(`Blocked installer IPC request from untrusted renderer frame: ${senderUrl || 'unknown'}`);
     }
   };
 
