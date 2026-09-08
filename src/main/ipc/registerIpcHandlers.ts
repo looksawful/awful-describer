@@ -13,14 +13,19 @@ import { getOllamaPorts, getSystemInfo } from '../services/systemService';
 
 export function registerIpcHandlers(
   getMainWindow: () => BrowserWindow | null,
-  isDev: boolean,
+  trustedRendererUrl: string,
   ollama: OllamaService,
 ): void {
   const trusted = <T>(handler: (event: IpcMainInvokeEvent, ...args: unknown[]) => T | Promise<T>) => {
     return async (event: IpcMainInvokeEvent, ...args: unknown[]): Promise<T> => {
-      const senderUrl = event.sender.getURL();
-      if (!isTrustedRendererUrl(senderUrl, isDev)) {
-        throw new Error(`Blocked IPC request from untrusted renderer: ${senderUrl}`);
+      const senderFrame = event.senderFrame;
+      const senderUrl = senderFrame?.url ?? '';
+      if (
+        !senderFrame ||
+        senderFrame !== event.sender.mainFrame ||
+        !isTrustedRendererUrl(senderUrl, trustedRendererUrl)
+      ) {
+        throw new Error(`Blocked IPC request from untrusted renderer frame: ${senderUrl || 'unknown'}`);
       }
       return handler(event, ...args);
     };
