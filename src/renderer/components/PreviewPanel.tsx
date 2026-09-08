@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { LatestOperationGate } from '../../shared/latestOperation';
 import { useStore } from '../stores/appStore';
 
 export default function PreviewPanel() {
@@ -7,39 +8,36 @@ export default function PreviewPanel() {
   const [loading, setLoading] = useState(false);
   const [zoom, setZoom] = useState(100);
   const [fullscreen, setFullscreen] = useState(false);
+  const loadGate = useRef(new LatestOperationGate()).current;
 
   const currentImage = images[currentImageIndex];
 
   useEffect(() => {
-    let cancelled = false;
+    const token = loadGate.begin();
     const filePath = currentImage?.path;
 
     if (!filePath) {
       setImageDataUrl(null);
       setLoading(false);
-      return () => {
-        cancelled = true;
-      };
+      return () => loadGate.invalidate(token);
     }
 
     setLoading(true);
     setImageDataUrl(null);
     window.api.file.readImage(filePath)
       .then((data) => {
-        if (cancelled) return;
+        if (!loadGate.isCurrent(token)) return;
         setImageDataUrl(data ? `data:${data.mimeType};base64,${data.base64}` : null);
       })
       .catch((error: unknown) => {
-        if (!cancelled) addLog('error', 'Failed to load preview', String(error));
+        if (loadGate.isCurrent(token)) addLog('error', 'Failed to load preview', String(error));
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (loadGate.isCurrent(token)) setLoading(false);
       });
 
-    return () => {
-      cancelled = true;
-    };
-  }, [currentImage?.id, currentImage?.path, addLog]);
+    return () => loadGate.invalidate(token);
+  }, [currentImage?.id, currentImage?.path, addLog, loadGate]);
 
   const handleOpenInFolder = () => {
     if (currentImage?.path) void window.api.shell.openPath(currentImage.path);
