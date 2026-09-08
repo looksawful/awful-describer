@@ -1,6 +1,8 @@
 node_modules/
 dist/
+dist-test/
 release/
+.history/
 .env
 *.log
 .DS_Store
