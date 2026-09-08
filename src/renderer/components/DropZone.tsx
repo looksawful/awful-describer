@@ -1,9 +1,11 @@
-import { useState, useCallback, type ReactNode } from 'react';
+import { useCallback, useState, type ReactNode } from 'react';
 import { useStore } from '../stores/appStore';
 
 interface DropZoneProps {
   children: ReactNode;
 }
+
+type ElectronFile = File & { path?: string };
 
 export default function DropZone({ children }: DropZoneProps) {
   const { addImages, addLog } = useStore();
@@ -18,9 +20,7 @@ export default function DropZone({ children }: DropZoneProps) {
   const handleDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (e.currentTarget === e.target) {
-      setIsDragging(false);
-    }
+    if (e.currentTarget === e.target) setIsDragging(false);
   }, []);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -28,15 +28,14 @@ export default function DropZone({ children }: DropZoneProps) {
     e.stopPropagation();
   }, []);
 
-  const handleDrop = useCallback(async (e: React.DragEvent) => {
+  const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
 
     const files = Array.from(e.dataTransfer.files);
-    const imageFiles = files.filter(file => 
-      file.type.startsWith('image/') || 
-      /\.(jpg|jpeg|png|gif|webp|bmp|tiff?)$/i.test(file.name)
+    const imageFiles = files.filter((file) =>
+      file.type.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp|bmp|tiff?)$/i.test(file.name),
     );
 
     if (imageFiles.length === 0) {
@@ -46,14 +45,20 @@ export default function DropZone({ children }: DropZoneProps) {
 
     addLog('info', `Processing ${imageFiles.length} dropped file(s)...`);
 
-    // In Electron, dropped files have a .path property
-    const newImages = imageFiles.map(file => ({
-      name: file.name,
-      path: (file as any).path || file.name,
-    }));
+    const newImages = imageFiles
+      .map((file) => ({
+        name: file.name,
+        path: (file as ElectronFile).path ?? '',
+      }))
+      .filter((file) => file.path.length > 0);
+
+    if (newImages.length === 0) {
+      addLog('warning', 'Dropped files do not expose filesystem paths in this Electron version');
+      return;
+    }
 
     addImages(newImages);
-    addLog('success', `Added ${imageFiles.length} image(s) to queue`);
+    addLog('success', `Added ${newImages.length} image(s) to queue`);
   }, [addImages, addLog]);
 
   return (
@@ -65,7 +70,6 @@ export default function DropZone({ children }: DropZoneProps) {
       onDrop={handleDrop}
     >
       {children}
-      
       {isDragging && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-bg-primary/90 border-2 border-dashed border-accent-primary pointer-events-none">
           <div className="flex flex-col items-center gap-4">
