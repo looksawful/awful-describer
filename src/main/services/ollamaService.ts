@@ -4,16 +4,19 @@ import * as http from 'http';
 import * as os from 'os';
 import * as path from 'path';
 import type { GenerateParams, GenerateResponse, OllamaCheck, OllamaModel, OllamaStatus } from '../../shared/ipc';
+import { buildModelCommandArgs, RequestRegistry, waitForCondition } from '../../shared/ollamaRuntime';
 
 const HOSTNAME = '127.0.0.1';
 const PORT = 11434;
+const MAX_GENERATE_RESPONSE_CHARS = 16 * 1024 * 1024;
+const MAX_STATUS_RESPONSE_CHARS = 2 * 1024 * 1024;
 
-const delay = (milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+const delay = (milliseconds: number) => new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
 
 export class OllamaService {
   private ownedProcess: ChildProcess | null = null;
   private executablePath: string | null = null;
-  private readonly activeRequests = new Map<string, http.ClientRequest>();
+  private readonly activeRequests = new RequestRegistry<http.ClientRequest>();
 
   async check(): Promise<OllamaCheck> {
     const executable = await this.resolveExecutable();
@@ -60,11 +63,18 @@ export class OllamaService {
       if (this.ownedProcess === child) this.ownedProcess = null;
     });
 
-    for (let attempt = 0; attempt < 12; attempt += 1) {
-      if ((await this.status(1000)).running) return { success: true, message: 'Started' };
-      await delay(500);
-    }
+    const ready = await waitForCondition(
+      async () => (await this.status(1000)).running,
+      12,
+      () => delay(500),
+    );
 
+    if (ready) return { success: true, message: 'Started' };
+
+    if (this.ownedProcess === child) {
+      this.ownedProcess = null;
+      child.kill();
+    }
     return { success: false, message: 'Timeout waiting for server' };
   }
 
@@ -86,15 +96,19 @@ export class OllamaService {
   }
 
   async pull(modelName: string, onProgress?: (data: string) => void): Promise<{ success: boolean; output?: string }> {
-    return this.runCli(['pull', modelName], onProgress);
+    return this.runCli([...buildModelCommandArgs('pull', modelName)], onProgress);
   }
 
   async delete(modelName: string): Promise<{ success: boolean }> {
-    const result = await this.runCli(['rm', modelName]);
+    const result = await this.runCli([...buildModelCommandArgs('rm', modelName)]);
     return { success: result.success };
   }
 
   generate(params: GenerateParams): Promise<GenerateResponse> {
+    if (this.activeRequests.has(params.requestId)) {
+      return Promise.reject(new Error(`Duplicate active request id: ${params.requestId}`));
+    }
+
     return new Promise((resolve, reject) => {
       const body = JSON.stringify({
         model: params.model,
@@ -127,7 +141,11 @@ export class OllamaService {
         response.setEncoding('utf8');
         response.on('data', (chunk: string) => {
           data += chunk;
+          if (data.length > MAX_GENERATE_RESPONSE_CHARS) {
+            request.destroy(new Error('Ollama response exceeded size limit'));
+          }
         });
+        response.once('error', (error) => settle(() => reject(error)));
         response.on('end', () => {
           settle(() => {
             try {
@@ -144,7 +162,14 @@ export class OllamaService {
         });
       });
 
-      this.activeRequests.set(params.requestId, request);
+      try {
+        this.activeRequests.register(params.requestId, request);
+      } catch (error) {
+        request.destroy();
+        reject(error);
+        return;
+      }
+
       request.once('error', (error) => settle(() => reject(error)));
       request.once('timeout', () => {
         request.destroy(new Error('Request timeout - model may be loading or response is too slow'));
@@ -155,10 +180,7 @@ export class OllamaService {
   }
 
   cancel(requestId: string): boolean {
-    const request = this.activeRequests.get(requestId);
-    if (!request) return false;
-    request.destroy(new Error('Request cancelled'));
-    return true;
+    return this.activeRequests.cancel(requestId);
   }
 
   private async resolveExecutable(): Promise<string | null> {
@@ -238,7 +260,11 @@ export class OllamaService {
         response.setEncoding('utf8');
         response.on('data', (chunk: string) => {
           data += chunk;
+          if (data.length > MAX_STATUS_RESPONSE_CHARS) {
+            request.destroy(new Error('Ollama status response exceeded size limit'));
+          }
         });
+        response.once('error', (error) => finish(() => reject(error)));
         response.on('end', () => finish(() => {
           try {
             resolve({ statusCode: response.statusCode ?? 0, body: JSON.parse(data) as T });
