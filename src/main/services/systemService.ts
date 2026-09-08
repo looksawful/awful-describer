@@ -20,7 +20,7 @@ export async function getSystemInfo(): Promise<SystemInfo> {
 export async function getOllamaPorts(): Promise<PortInfo[]> {
   const connections = await si.networkConnections();
   return connections
-    .filter((connection) => connection.localPort === '11434' || connection.localPort === 11434)
+    .filter((connection) => String(connection.localPort) === '11434')
     .map((connection) => ({
       local: `${connection.localAddress}:${connection.localPort}`,
       foreign: connection.peerAddress ? `${connection.peerAddress}:${connection.peerPort}` : '',
