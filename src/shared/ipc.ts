@@ -227,15 +227,15 @@ export function isSafeExternalUrl(value: string): boolean {
   }
 }
 
-export function isTrustedRendererUrl(value: string, isDev: boolean): boolean {
+export function isTrustedRendererUrl(value: string, trustedRendererUrl: string): boolean {
   try {
-    const url = new URL(value);
-    if (isDev) {
-      return url.protocol === 'http:' && url.hostname === 'localhost' && url.port === '5173';
-    }
-    if (url.protocol !== 'file:') return false;
-    const normalizedPath = decodeURIComponent(url.pathname).replace(/\\/g, '/');
-    return normalizedPath.endsWith('/renderer/index.html');
+    const actual = new URL(value);
+    const expected = new URL(trustedRendererUrl);
+
+    if (actual.protocol !== expected.protocol) return false;
+    if (expected.protocol === 'file:') return actual.href === expected.href;
+
+    return actual.origin === expected.origin;
   } catch {
     return false;
   }
