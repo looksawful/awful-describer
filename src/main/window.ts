@@ -15,8 +15,18 @@ export function createMainWindow(isDev: boolean): BrowserWindow {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
+      webSecurity: true,
       preload: path.join(__dirname, 'preload.js'),
     },
+  });
+
+  window.webContents.session.setPermissionCheckHandler(() => false);
+  window.webContents.session.setPermissionRequestHandler((_webContents, _permission, callback) => {
+    callback(false);
+  });
+
+  window.webContents.on('will-attach-webview', (event) => {
+    event.preventDefault();
   });
 
   window.webContents.setWindowOpenHandler(({ url }) => {
