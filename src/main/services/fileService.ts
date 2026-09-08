@@ -1,5 +1,4 @@
 import * as fs from 'fs';
-import * as os from 'os';
 import * as path from 'path';
 import { getImageMimeType, type ReadImageResult } from '../../shared/ipc';
 
@@ -46,31 +45,4 @@ export async function searchImages(directory: string, pattern: string): Promise<
 
   await searchDirectory(directory);
   return results;
-}
-
-export async function getOllamaModelsPathInfo(): Promise<{ path: string; exists: boolean; size: number }> {
-  const modelsPath = path.join(os.homedir(), '.ollama', 'models');
-  try {
-    const stats = await fs.promises.stat(modelsPath);
-    if (!stats.isDirectory()) return { path: modelsPath, exists: false, size: 0 };
-  } catch {
-    return { path: modelsPath, exists: false, size: 0 };
-  }
-
-  const getSize = async (directory: string): Promise<number> => {
-    let total = 0;
-    const items = await fs.promises.readdir(directory, { withFileTypes: true });
-    for (const item of items) {
-      const fullPath = path.join(directory, item.name);
-      if (item.isDirectory()) total += await getSize(fullPath);
-      else if (item.isFile()) total += (await fs.promises.stat(fullPath)).size;
-    }
-    return total;
-  };
-
-  try {
-    return { path: modelsPath, exists: true, size: await getSize(modelsPath) };
-  } catch {
-    return { path: modelsPath, exists: true, size: 0 };
-  }
 }
