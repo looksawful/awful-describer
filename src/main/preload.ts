@@ -1,12 +1,16 @@
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
+import type { ApiBridge, GenerateParams } from '../shared/ipc';
 
-contextBridge.exposeInMainWorld('api', {
-  // Window controls
+function subscribe<T>(channel: string, callback: (data: T) => void): () => void {
+  const listener = (_event: IpcRendererEvent, data: T) => callback(data);
+  ipcRenderer.on(channel, listener);
+  return () => ipcRenderer.removeListener(channel, listener);
+}
+
+const api: ApiBridge = {
   minimize: () => ipcRenderer.invoke('window:minimize'),
   maximize: () => ipcRenderer.invoke('window:maximize'),
   close: () => ipcRenderer.invoke('window:close'),
-
-  // Ollama
   ollama: {
     check: () => ipcRenderer.invoke('ollama:check'),
     status: () => ipcRenderer.invoke('ollama:status'),
@@ -14,44 +18,28 @@ contextBridge.exposeInMainWorld('api', {
     stop: () => ipcRenderer.invoke('ollama:stop'),
     pull: (model: string) => ipcRenderer.invoke('ollama:pull', model),
     delete: (model: string) => ipcRenderer.invoke('ollama:delete', model),
-    generate: (params: {
-      model: string;
-      prompt: string;
-      images?: string[];
-      options?: Record<string, unknown>;
-    }) => ipcRenderer.invoke('ollama:generate', params),
+    generate: (params: GenerateParams) => ipcRenderer.invoke('ollama:generate', params),
+    cancel: (requestId: string) => ipcRenderer.invoke('ollama:cancel', requestId),
     downloadInstaller: () => ipcRenderer.invoke('ollama:download-installer'),
-    runInstaller: (path: string) => ipcRenderer.invoke('ollama:run-installer', path),
-    onPullProgress: (callback: (data: { model: string; data: string }) => void) => {
-      ipcRenderer.on('ollama:pull-progress', (_, data) => callback(data));
-      return () => ipcRenderer.removeAllListeners('ollama:pull-progress');
-    },
-    onDownloadProgress: (callback: (data: { downloaded: number; total: number; percent: number }) => void) => {
-      ipcRenderer.on('ollama:download-progress', (_, data) => callback(data));
-      return () => ipcRenderer.removeAllListeners('ollama:download-progress');
-    },
+    runInstaller: (installerPath: string) => ipcRenderer.invoke('ollama:run-installer', installerPath),
+    onPullProgress: (callback) => subscribe('ollama:pull-progress', callback),
+    onDownloadProgress: (callback) => subscribe('ollama:download-progress', callback),
   },
-
-  // Files
   file: {
     selectImages: () => ipcRenderer.invoke('file:select-images'),
     selectFolder: () => ipcRenderer.invoke('file:select-folder'),
-    readImage: (path: string) => ipcRenderer.invoke('file:read-image', path),
-    saveResult: (content: string, defaultName: string) => 
-      ipcRenderer.invoke('file:save-result', content, defaultName),
-    search: (directory: string, pattern: string) => 
-      ipcRenderer.invoke('file:search', directory, pattern),
+    readImage: (filePath: string) => ipcRenderer.invoke('file:read-image', filePath),
+    saveResult: (content: string, defaultName: string) => ipcRenderer.invoke('file:save-result', content, defaultName),
+    search: (directory: string, pattern: string) => ipcRenderer.invoke('file:search', directory, pattern),
   },
-
-  // System
   system: {
     info: () => ipcRenderer.invoke('system:info'),
     ports: () => ipcRenderer.invoke('system:ports'),
   },
-
-  // Shell
   shell: {
-    openPath: (path: string) => ipcRenderer.invoke('shell:open-path', path),
+    openPath: (filePath: string) => ipcRenderer.invoke('shell:open-path', filePath),
     openUrl: (url: string) => ipcRenderer.invoke('shell:open-url', url),
   },
-});
+};
+
+contextBridge.exposeInMainWorld('api', api);
