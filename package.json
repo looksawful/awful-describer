@@ -18,7 +18,8 @@
     "build": "npm run build:renderer && npm run build:main",
     "build:main": "tsc -p tsconfig.main.json",
     "build:renderer": "vite build",
-    "smoke:electron": "npm run build && npm run test:compile && electron dist-test/tests/electron-smoke.test.js",
+    "smoke:electron:run": "electron dist-test/tests/electron-smoke.test.js",
+    "smoke:electron": "npm run build && npm run test:compile && npm run smoke:electron:run",
     "start": "electron .",
     "pack": "npm run build && electron-builder --dir",
     "dist": "npm run build && electron-builder"
