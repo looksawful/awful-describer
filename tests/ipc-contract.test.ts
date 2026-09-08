@@ -7,6 +7,11 @@ import {
   sanitizeGenerateParams,
   sanitizeModelOptions,
 } from '../src/shared/ipc';
+import {
+  buildModelCommandArgs,
+  RequestRegistry,
+  waitForCondition,
+} from '../src/shared/ollamaRuntime';
 
 test('image MIME type follows the source extension', () => {
   assert.equal(getImageMimeType('photo.JPG'), 'image/jpeg');
@@ -48,4 +53,66 @@ test('generate requests require an id, model and prompt and allow realistic base
   assert.equal(result.model, 'llava:latest');
   assert.equal(result.images?.[0].length, image.length);
   assert.throws(() => sanitizeGenerateParams({ model: 'llava:latest', prompt: 'x' }), /requestId/);
+});
+
+test('Ollama model commands preserve the model name as one argument', () => {
+  assert.deepEqual(buildModelCommandArgs('pull', 'qwen2-vl:7b'), ['pull', 'qwen2-vl:7b']);
+  assert.deepEqual(buildModelCommandArgs('rm', 'model name; still one arg'), ['rm', 'model name; still one arg']);
+  assert.throws(() => buildModelCommandArgs('pull', '   '), /Invalid Ollama model name/);
+});
+
+test('readiness retry stops immediately after success and is bounded on failure', async () => {
+  let checks = 0;
+  let waits = 0;
+  const ready = await waitForCondition(
+    () => {
+      checks += 1;
+      return checks === 3;
+    },
+    5,
+    () => {
+      waits += 1;
+    },
+  );
+
+  assert.equal(ready, true);
+  assert.equal(checks, 3);
+  assert.equal(waits, 2);
+
+  checks = 0;
+  waits = 0;
+  const failed = await waitForCondition(
+    () => {
+      checks += 1;
+      return false;
+    },
+    3,
+    () => {
+      waits += 1;
+    },
+  );
+
+  assert.equal(failed, false);
+  assert.equal(checks, 3);
+  assert.equal(waits, 2);
+});
+
+test('request registry rejects duplicate active ids and cancellation destroys once', () => {
+  const registry = new RequestRegistry<{ destroy(error?: Error): void }>();
+  const destroyed: string[] = [];
+  const request = {
+    destroy(error?: Error) {
+      destroyed.push(error?.message ?? 'destroyed');
+    },
+  };
+
+  registry.register('request-1', request);
+  assert.equal(registry.has('request-1'), true);
+  assert.throws(() => registry.register('request-1', request), /Duplicate active request id/);
+
+  assert.equal(registry.cancel('request-1'), true);
+  assert.deepEqual(destroyed, ['Request cancelled']);
+  assert.equal(registry.has('request-1'), false);
+  assert.equal(registry.cancel('request-1'), false);
+  assert.deepEqual(destroyed, ['Request cancelled']);
 });
