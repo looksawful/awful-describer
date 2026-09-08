@@ -1,8 +1,8 @@
+import { spawn, type ChildProcess } from 'child_process';
 import * as fs from 'fs';
 import * as http from 'http';
 import * as os from 'os';
 import * as path from 'path';
-import { spawn, type ChildProcess, type ClientRequest } from 'child_process';
 import type { GenerateParams, GenerateResponse, OllamaCheck, OllamaModel, OllamaStatus } from '../../shared/ipc';
 
 const HOSTNAME = '127.0.0.1';
@@ -13,7 +13,7 @@ const delay = (milliseconds: number) => new Promise((resolve) => setTimeout(reso
 export class OllamaService {
   private ownedProcess: ChildProcess | null = null;
   private executablePath: string | null = null;
-  private readonly activeRequests = new Map<string, ClientRequest>();
+  private readonly activeRequests = new Map<string, http.ClientRequest>();
 
   async check(): Promise<OllamaCheck> {
     const executable = await this.resolveExecutable();
@@ -33,8 +33,7 @@ export class OllamaService {
   }
 
   async start(): Promise<{ success: boolean; message?: string }> {
-    const currentStatus = await this.status(1500);
-    if (currentStatus.running) return { success: true, message: 'Already running' };
+    if ((await this.status(1500)).running) return { success: true, message: 'Already running' };
     if (this.ownedProcess) return { success: true, message: 'Process exists' };
 
     const executable = await this.resolveExecutable();
@@ -44,11 +43,12 @@ export class OllamaService {
       detached: false,
       stdio: 'ignore',
       windowsHide: true,
+      shell: false,
     });
 
     try {
       await new Promise<void>((resolve, reject) => {
-        child.once('spawn', () => resolve());
+        child.once('spawn', resolve);
         child.once('error', reject);
       });
     } catch (error) {
@@ -79,7 +79,10 @@ export class OllamaService {
     const processToStop = this.ownedProcess;
     this.ownedProcess = null;
     const success = processToStop.kill();
-    return { success, message: success ? 'Stopped app-owned Ollama process' : 'Failed to stop Ollama process' };
+    return {
+      success,
+      message: success ? 'Stopped app-owned Ollama process' : 'Failed to stop Ollama process',
+    };
   }
 
   async pull(modelName: string, onProgress?: (data: string) => void): Promise<{ success: boolean; output?: string }> {
@@ -142,8 +145,10 @@ export class OllamaService {
       });
 
       this.activeRequests.set(params.requestId, request);
-      request.on('error', (error) => settle(() => reject(error)));
-      request.on('timeout', () => request.destroy(new Error('Request timeout - model may be loading or response is too slow')));
+      request.once('error', (error) => settle(() => reject(error)));
+      request.once('timeout', () => {
+        request.destroy(new Error('Request timeout - model may be loading or response is too slow'));
+      });
       request.write(body);
       request.end();
     });
