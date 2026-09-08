@@ -128,6 +128,8 @@ const MODEL_OPTION_KEYS = new Set<keyof ModelOptions>([
   'stop',
 ]);
 
+const MAX_BASE64_IMAGE_LENGTH = 70 * 1024 * 1024;
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -135,6 +137,18 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 export function assertNonEmptyString(value: unknown, field: string): string {
   if (typeof value !== 'string' || value.trim().length === 0 || value.length > 32768 || value.includes('\0')) {
     throw new Error(`Invalid ${field}`);
+  }
+  return value;
+}
+
+function assertBase64Image(value: unknown, index: number): string {
+  if (
+    typeof value !== 'string' ||
+    value.length === 0 ||
+    value.length > MAX_BASE64_IMAGE_LENGTH ||
+    value.includes('\0')
+  ) {
+    throw new Error(`Invalid image ${index}`);
   }
   return value;
 }
@@ -169,10 +183,8 @@ export function sanitizeGenerateParams(value: unknown): GenerateParams {
 
   let images: string[] | undefined;
   if (value.images !== undefined) {
-    if (!Array.isArray(value.images) || value.images.length > 16) {
-      throw new Error('Invalid images');
-    }
-    images = value.images.map((image, index) => assertNonEmptyString(image, `image ${index}`));
+    if (!Array.isArray(value.images) || value.images.length > 16) throw new Error('Invalid images');
+    images = value.images.map((image, index) => assertBase64Image(image, index));
   }
 
   return {
@@ -216,13 +228,15 @@ export function isSafeExternalUrl(value: string): boolean {
 }
 
 export function isTrustedRendererUrl(value: string, isDev: boolean): boolean {
-  if (isDev) {
-    try {
-      const url = new URL(value);
+  try {
+    const url = new URL(value);
+    if (isDev) {
       return url.protocol === 'http:' && url.hostname === 'localhost' && url.port === '5173';
-    } catch {
-      return false;
     }
+    if (url.protocol !== 'file:') return false;
+    const normalizedPath = decodeURIComponent(url.pathname).replace(/\\/g, '/');
+    return normalizedPath.endsWith('/renderer/index.html');
+  } catch {
+    return false;
   }
-  return value.startsWith('file://');
 }
