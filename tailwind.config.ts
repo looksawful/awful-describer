@@ -1,8 +1,7 @@
-/** @type {import('tailwindcss').Config} */
-export default {
-  content: [
-    "./src/renderer/**/*.{js,ts,jsx,tsx}",
-  ],
+import type { Config } from 'tailwindcss';
+
+const config = {
+  content: ['./src/renderer/**/*.{ts,tsx}'],
   theme: {
     extend: {
       colors: {
@@ -32,7 +31,7 @@ export default {
           warning: '#ffaa00',
           error: '#ff4444',
           info: '#4488ff',
-        }
+        },
       },
       fontFamily: {
         mono: ['JetBrains Mono', 'Fira Code', 'Consolas', 'monospace'],
@@ -56,4 +55,6 @@ export default {
     },
   },
   plugins: [],
-}
+} satisfies Config;
+
+export default config;

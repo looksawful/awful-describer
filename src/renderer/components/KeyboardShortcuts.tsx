@@ -1,71 +1,70 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '../stores/appStore';
 
+function fileNameFromPath(filePath: string): string {
+  return filePath.split(/[\\/]/).pop() || filePath;
+}
+
 export default function KeyboardShortcuts() {
-  const { 
+  const {
     processQueue,
     processCurrentImage,
+    abortProcessing,
     togglePanel,
+    addImages,
     addLog,
     images,
-    selectedImage,
+    currentImageIndex,
     isProcessing,
   } = useStore();
 
   const [showHelp, setShowHelp] = useState(false);
+  const currentImage = images[currentImageIndex];
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't trigger shortcuts when typing in inputs
+    const handleKeyDown = async (e: KeyboardEvent) => {
       if (
         e.target instanceof HTMLInputElement ||
         e.target instanceof HTMLTextAreaElement
       ) {
-        // Allow Ctrl+Enter in textareas
-        if (!(e.ctrlKey && e.key === 'Enter')) {
-          return;
+        if (!(e.ctrlKey && e.key === 'Enter')) return;
+      }
+
+      if (e.ctrlKey && e.key.toLowerCase() === 'o') {
+        e.preventDefault();
+        const selected = await window.api.file.selectImages();
+        if (selected.length > 0) {
+          addImages(selected.map((filePath) => ({ path: filePath, name: fileNameFromPath(filePath) })));
+          addLog('success', `Added ${selected.length} image(s) to queue`);
         }
       }
 
-      // Ctrl + O - Open file dialog
-      if (e.ctrlKey && e.key === 'o') {
-        e.preventDefault();
-        window.api.file.selectImages();
-        addLog('info', 'Opening file selector...');
-      }
-
-      // Ctrl + Enter - Process current image
       if (e.ctrlKey && !e.shiftKey && e.key === 'Enter') {
         e.preventDefault();
-        if (!isProcessing && selectedImage) {
-          processCurrentImage();
+        if (!isProcessing && currentImage) {
+          void processCurrentImage();
           addLog('info', 'Processing current image (Ctrl+Enter)');
         }
       }
 
-      // Ctrl + Shift + Enter - Process all queue
       if (e.ctrlKey && e.shiftKey && e.key === 'Enter') {
         e.preventDefault();
         if (!isProcessing && images.length > 0) {
-          processQueue();
+          void processQueue();
           addLog('info', 'Processing entire queue (Ctrl+Shift+Enter)');
         }
       }
 
-      // Escape - Cancel processing or close modals
       if (e.key === 'Escape') {
-        if (showHelp) {
-          setShowHelp(false);
-        }
+        if (showHelp) setShowHelp(false);
+        else if (isProcessing) await abortProcessing();
       }
 
-      // ? or F1 - Show help
       if (e.key === '?' || e.key === 'F1') {
         e.preventDefault();
-        setShowHelp(prev => !prev);
+        setShowHelp((previous) => !previous);
       }
 
-      // Panel toggles with number keys
       if (e.altKey) {
         switch (e.key) {
           case '1':
@@ -107,26 +106,28 @@ export default function KeyboardShortcuts() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [
-    processQueue, 
-    processCurrentImage, 
-    togglePanel, 
-    addLog, 
-    images.length, 
-    selectedImage, 
-    isProcessing, 
-    showHelp
+    abortProcessing,
+    addImages,
+    addLog,
+    currentImage,
+    images.length,
+    isProcessing,
+    processCurrentImage,
+    processQueue,
+    showHelp,
+    togglePanel,
   ]);
 
   if (!showHelp) return null;
 
   return (
-    <div 
+    <div
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70"
       onClick={() => setShowHelp(false)}
     >
-      <div 
+      <div
         className="bg-bg-secondary border border-border-default rounded-lg p-6 w-[500px] shadow-2xl"
-        onClick={e => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold">Keyboard Shortcuts</h2>
@@ -161,7 +162,7 @@ export default function KeyboardShortcuts() {
                 <kbd className="kbd">? / F1</kbd>
               </div>
               <div className="flex justify-between">
-                <span className="text-text-secondary">Close modal</span>
+                <span className="text-text-secondary">Cancel processing / close modal</span>
                 <kbd className="kbd">Escape</kbd>
               </div>
             </div>
@@ -170,38 +171,14 @@ export default function KeyboardShortcuts() {
           <div>
             <h3 className="text-sm font-medium text-accent-primary mb-2">Panel Toggles</h3>
             <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
-              <div className="flex justify-between">
-                <span className="text-text-secondary">Models</span>
-                <kbd className="kbd">Alt + 1</kbd>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-text-secondary">Queue</span>
-                <kbd className="kbd">Alt + 2</kbd>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-text-secondary">Preview</span>
-                <kbd className="kbd">Alt + 3</kbd>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-text-secondary">Prompt</span>
-                <kbd className="kbd">Alt + 4</kbd>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-text-secondary">Options</span>
-                <kbd className="kbd">Alt + 5</kbd>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-text-secondary">Output</span>
-                <kbd className="kbd">Alt + 6</kbd>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-text-secondary">Log</span>
-                <kbd className="kbd">Alt + 7</kbd>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-text-secondary">History</span>
-                <kbd className="kbd">Alt + 8</kbd>
-              </div>
+              <div className="flex justify-between"><span className="text-text-secondary">Models</span><kbd className="kbd">Alt + 1</kbd></div>
+              <div className="flex justify-between"><span className="text-text-secondary">Queue</span><kbd className="kbd">Alt + 2</kbd></div>
+              <div className="flex justify-between"><span className="text-text-secondary">Preview</span><kbd className="kbd">Alt + 3</kbd></div>
+              <div className="flex justify-between"><span className="text-text-secondary">Prompt</span><kbd className="kbd">Alt + 4</kbd></div>
+              <div className="flex justify-between"><span className="text-text-secondary">Options</span><kbd className="kbd">Alt + 5</kbd></div>
+              <div className="flex justify-between"><span className="text-text-secondary">Output</span><kbd className="kbd">Alt + 6</kbd></div>
+              <div className="flex justify-between"><span className="text-text-secondary">Log</span><kbd className="kbd">Alt + 7</kbd></div>
+              <div className="flex justify-between"><span className="text-text-secondary">History</span><kbd className="kbd">Alt + 8</kbd></div>
             </div>
           </div>
 

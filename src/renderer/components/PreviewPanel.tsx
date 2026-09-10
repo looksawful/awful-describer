@@ -1,39 +1,51 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { LatestOperationGate } from '../../shared/latestOperation';
 import { useStore } from '../stores/appStore';
 
 export default function PreviewPanel() {
-  const { images, currentImageIndex, updateImage, addLog } = useStore();
-  const [imageData, setImageData] = useState<string | null>(null);
+  const { images, currentImageIndex, addLog } = useStore();
+  const [imageDataUrl, setImageDataUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [zoom, setZoom] = useState(100);
   const [fullscreen, setFullscreen] = useState(false);
+  const loadGate = useRef(new LatestOperationGate()).current;
 
   const currentImage = images[currentImageIndex];
 
   useEffect(() => {
-    if (currentImage?.path) {
-      setLoading(true);
-      window.api.file.readImage(currentImage.path).then((data) => {
-        if (data) {
-          setImageData(data);
-          updateImage(currentImage.id, { base64: data });
-        }
-        setLoading(false);
-      });
-    } else {
-      setImageData(null);
+    const token = loadGate.begin();
+    const filePath = currentImage?.path;
+
+    if (!filePath) {
+      setImageDataUrl(null);
+      setLoading(false);
+      return () => loadGate.invalidate(token);
     }
-  }, [currentImage?.path]);
+
+    setLoading(true);
+    setImageDataUrl(null);
+    window.api.file.readImage(filePath)
+      .then((data) => {
+        if (!loadGate.isCurrent(token)) return;
+        setImageDataUrl(data ? `data:${data.mimeType};base64,${data.base64}` : null);
+      })
+      .catch((error: unknown) => {
+        if (loadGate.isCurrent(token)) addLog('error', 'Failed to load preview', String(error));
+      })
+      .finally(() => {
+        if (loadGate.isCurrent(token)) setLoading(false);
+      });
+
+    return () => loadGate.invalidate(token);
+  }, [currentImage?.id, currentImage?.path, addLog, loadGate]);
 
   const handleOpenInFolder = () => {
-    if (currentImage?.path) {
-      window.api.shell.openPath(currentImage.path);
-    }
+    if (currentImage?.path) void window.api.shell.openPath(currentImage.path);
   };
 
   const handleCopyPath = () => {
     if (currentImage?.path) {
-      navigator.clipboard.writeText(currentImage.path);
+      void navigator.clipboard.writeText(currentImage.path);
       addLog('info', 'Path copied to clipboard');
     }
   };
@@ -121,13 +133,13 @@ export default function PreviewPanel() {
             <div className="w-8 h-8 border-2 border-accent-primary border-t-transparent rounded-full animate-spin" />
             <span className="text-sm text-text-muted">Loading...</span>
           </div>
-        ) : imageData ? (
-          <div 
+        ) : imageDataUrl ? (
+          <div
             className="relative transition-transform"
             style={{ transform: `scale(${zoom / 100})` }}
           >
             <img
-              src={`data:image/png;base64,${imageData}`}
+              src={imageDataUrl}
               alt={currentImage?.name}
               className="max-w-none"
               style={{ imageRendering: zoom > 100 ? 'pixelated' : 'auto' }}
@@ -160,11 +172,7 @@ export default function PreviewPanel() {
   );
 
   if (fullscreen) {
-    return (
-      <div className="fixed inset-0 z-50">
-        {content}
-      </div>
-    );
+    return <div className="fixed inset-0 z-50">{content}</div>;
   }
 
   return content;

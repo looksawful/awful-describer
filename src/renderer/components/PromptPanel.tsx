@@ -1,17 +1,14 @@
 import { useStore } from '../stores/appStore';
 
 export default function PromptPanel() {
-  const { 
-    currentPrompt, 
-    setCurrentPrompt, 
+  const {
+    currentPrompt,
+    setCurrentPrompt,
     selectedPreset,
     presets,
     images,
     currentImageIndex,
-    selectedModel,
-    currentOptions,
     isProcessing,
-    shouldAbort,
     processCurrentImage,
     processQueue,
     abortProcessing,
@@ -19,14 +16,14 @@ export default function PromptPanel() {
   } = useStore();
 
   const currentImage = images[currentImageIndex];
-  const pendingCount = images.filter(img => img.status === 'pending').length;
+  const pendingCount = images.filter((img) => img.status === 'pending').length;
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(currentPrompt);
+    void navigator.clipboard.writeText(currentPrompt);
     addLog('info', 'Prompt copied to clipboard');
   };
 
-  const currentPreset = selectedPreset ? presets.find(p => p.id === selectedPreset) : null;
+  const currentPreset = selectedPreset ? presets.find((preset) => preset.id === selectedPreset) : null;
 
   return (
     <div className="h-36 border-t border-border-default flex flex-col">
@@ -51,7 +48,7 @@ export default function PromptPanel() {
           </button>
           {isProcessing ? (
             <button
-              onClick={abortProcessing}
+              onClick={() => void abortProcessing()}
               className="btn bg-status-error/20 text-status-error hover:bg-status-error/30 text-xs py-1"
               title="Stop processing"
             >
@@ -63,7 +60,7 @@ export default function PromptPanel() {
           ) : (
             <>
               <button
-                onClick={processCurrentImage}
+                onClick={() => void processCurrentImage()}
                 disabled={!currentImage || isProcessing}
                 className="btn btn-primary text-xs py-1"
                 title="Process current (Ctrl+Enter)"
@@ -75,7 +72,7 @@ export default function PromptPanel() {
                 Run
               </button>
               <button
-                onClick={processQueue}
+                onClick={() => void processQueue()}
                 disabled={pendingCount === 0 || isProcessing}
                 className="btn btn-secondary text-xs py-1"
                 title="Process all pending (Ctrl+Shift+Enter)"
@@ -93,7 +90,7 @@ export default function PromptPanel() {
       <div className="flex-1 p-2">
         <textarea
           value={currentPrompt}
-          onChange={(e) => setCurrentPrompt(e.target.value)}
+          onChange={(event) => setCurrentPrompt(event.target.value)}
           placeholder="Enter your prompt here..."
           className="w-full h-full resize-none bg-bg-primary border border-border-default rounded p-2 text-sm font-mono focus:border-accent-primary outline-none"
         />
