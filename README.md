@@ -4,9 +4,11 @@ Windows-first Electron desktop interface for describing images with local Ollama
 
 ## Current engineering status
 
-The repository is undergoing a TypeScript/security hardening pass in `refactor/typescript-hardening` / PR #9. GitHub Issues #1–#10 are the canonical engineering backlog.
+The default branch is still `master`. The next-baseline candidate is `refactor/typescript-hardening` in draft PR #9.
 
-The current branch is TypeScript/TSX-first, with a shared typed IPC contract, strict compiler checks, Node unit tests, and Windows CI. Electron itself is still pinned to the legacy 28.x line and must not be treated as current until #7 is completed.
+PR #9 contains the completed baseline work from Issues #1–#5 and #8: TypeScript hardening, a shared typed IPC contract, stricter Electron boundaries, deterministic Ollama request cancellation, renderer correctness fixes, repository guidance, tests, and Windows CI. Residual work is tracked by #6, #7, and #10–#18; #18 is the cross-cutting completion gate.
+
+The candidate branch is TypeScript/TSX-first and still pins Electron 28.x. Treat it as a hardened candidate, not as a current supported-runtime release baseline, until the dependency, capability, runtime-upgrade, and verification work is complete.
 
 ## Stack
 
@@ -24,7 +26,7 @@ The current branch is TypeScript/TSX-first, with a shared typed IPC contract, st
 - Windows 11 is the primary supported development/runtime target.
 - Node.js 22 is the CI baseline.
 - npm with the committed lockfile.
-- Ollama for real image-description runtime tests.
+- Ollama for real image-description runtime acceptance tests.
 
 ## Install
 
@@ -44,7 +46,7 @@ Renderer only:
 npm run dev:renderer
 ```
 
-Build main process and start Electron:
+Build the main process and start Electron:
 
 ```powershell
 npm run dev:main
@@ -64,15 +66,28 @@ Run the production build:
 npm run build
 ```
 
+Run the existing Electron boot smoke after building:
+
+```powershell
+npm run smoke:electron:run
+```
+
 Package without installer output:
 
 ```powershell
 npm run pack
 ```
 
-The GitHub Actions quality job runs `npm ci`, `npm run check`, and `npm run build` on `windows-latest`.
+The Windows GitHub Actions job currently runs, in order:
 
-A green CI run proves compilation/unit/build health. It does not by itself prove native Electron dialogs, packaged runtime, drag-and-drop, Ollama installation, model inference, or GPU behavior. Those require Windows runtime smoke/E2E checks.
+1. `npm ci`
+2. `npm run check`
+3. `npm run build`
+4. `npm run smoke:electron:run`
+
+The existing Electron smoke is deliberately narrow. It loads the built renderer and preload in a test-created `BrowserWindow` with mocked handlers, then checks React mount and selected bridge functions. A green run therefore proves the current type/unit/build gates plus this renderer/preload boot path. It does **not** prove the real application bootstrap, real handler registration, filesystem grants, packaged Windows behavior, native dialogs, Ollama installation, model inference, or GPU use. #16 owns those higher verification layers.
+
+For PR CI, refer to the GitHub Actions run associated with the current PR head and base. Do not describe a pull-request run as proof that an arbitrary standalone SHA is healthy outside that PR context.
 
 ## Architecture
 
@@ -105,24 +120,28 @@ See `docs/architecture.md` and `AGENTS.md` for boundaries and maintenance rules.
 
 ## Security model
 
+Implemented in the candidate branch:
+
 - `nodeIntegration: false`
 - `contextIsolation: true`
-- sandbox-compatible renderer/preload boundary
-- deny-by-default renderer navigation/new windows
+- `sandbox: true`
+- `webSecurity: true`
+- deny-by-default renderer navigation and new windows
+- deny-all Electron permission handlers unless a future capability is explicitly designed
 - privileged IPC sender validation
 - runtime validation for IPC input
-- no renderer-controlled shell command strings
+- no renderer-controlled shell command strings for model operations
 - HTTPS-only external URL policy by default
 - app shutdown stops only an Ollama process started by this application
 - active generation can be cancelled by request ID
 - image reads are extension/size bounded
-- installer execution is restricted to the file downloaded by the current application session
+- installer launch is restricted to the path downloaded by the current application session
 
-The dependency tree currently has unresolved security advisories tracked by #10. Do not interpret the application-level hardening above as a claim that the legacy dependency graph is clean.
+These controls are not the final security boundary. Path strings from the trusted renderer are not yet explicit user-grant capabilities (#11), cross-process/resource budgets remain incomplete (#13), installer authenticity is not yet independently verified (#12), and the dependency graph has unresolved advisories (#10).
 
 ## Electron upgrade warning
 
-Do not directly bump Electron 28 to a current major without addressing drag-and-drop first. Electron 32 removed the non-standard `File.path` property used by the legacy drop flow. #7 tracks migration to `webUtils.getPathForFile` through preload and the controlled Electron upgrade.
+Do not directly bump Electron 28 to a newer major while preserving the legacy renderer `File.path` flow. #11 defines the filesystem grant model; #7 owns the supported drag/drop path migration and controlled Electron/electron-builder upgrade. Do not replace `File.path` with casts or a broad preload escape hatch.
 
 ## Agent workflow
 
@@ -132,4 +151,4 @@ Read `AGENTS.md`. Repository-local skills live in `.agents/skills/`:
 - `ollama-runtime`
 - `typescript-quality`
 
-`docs/agent-context/` contains short navigation/context documents. GitHub Issues remain the canonical implementation backlog; Notion mirrors durable project/audit documentation.
+`docs/agent-context/` contains short navigation/context documents. GitHub Issues remain the canonical implementation backlog; Notion stores durable project/audit context rather than a competing executable task list.
