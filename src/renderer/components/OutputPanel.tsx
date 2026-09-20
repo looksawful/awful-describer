@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useStore } from '../stores/appStore';
+import { formatProcessedAt } from '../utils/formatters';
 
 export default function OutputPanel() {
   const { images, currentImageIndex, addLog } = useStore();
@@ -95,7 +96,7 @@ export default function OutputPanel() {
             {currentImage?.processedAt && (
               <div className="pt-3 border-t border-border-default">
                 <p className="text-xs text-text-muted">
-                  Processed: {currentImage.processedAt.toLocaleString()}
+                  Processed: {formatProcessedAt(currentImage.processedAt)}
                 </p>
               </div>
             )}
