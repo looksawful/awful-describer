@@ -13,7 +13,9 @@
     "test:unit": "node --experimental-strip-types --test tests/*.test.ts",
     "start": "electron .",
     "pack": "npm run build && electron-builder --dir",
-    "dist": "npm run build && electron-builder"
+    "dist": "npm run build && electron-builder",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build"
   },
   "build": {
     "appId": "com.awful.describer",
@@ -36,6 +38,8 @@
     "systeminformation": "^5.21.24"
   },
   "devDependencies": {
+    "@storybook/addon-docs": "10.6.7",
+    "@storybook/react-vite": "10.6.7",
     "@types/node": "^20.10.0",
     "@types/react": "^18.2.45",
     "@types/react-dom": "^18.2.18",
@@ -48,6 +52,7 @@
     "postcss": "^8.4.32",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "storybook": "10.6.7",
     "tailwindcss": "^3.4.0",
     "typescript": "^5.3.3",
     "vite": "^5.0.10",
